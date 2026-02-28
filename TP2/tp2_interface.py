@@ -92,8 +92,8 @@ if st.button("Evaluate population"):
     # STATISTIQUES
     # ======================================
     st.write("### Statistics")
-    st.success(f"Min = {np.min(all_runs_fitness):.4f}")
-    st.warning(f"Max = {np.max(all_runs_fitness):.4f}")
+    st.success(f"Min (Best) = {np.min(all_runs_fitness):.4f}")
+    st.warning(f"Max (Worst) = {np.max(all_runs_fitness):.4f}")
     st.info(f"Mean = {all_runs_fitness.mean():.4f} — STD = {all_runs_fitness.std():.4f}")
 
     # ======================================
