@@ -49,14 +49,15 @@ high = st.number_input("Range max", value=100.0)
 population_size = st.slider("Population Size", 10, 500, 100, step=10)
 runs = st.slider("Number of Runs", 1, 100, 10)
 
+# ==============================================
+# Importation de la population depuis un CSV
+# ==============================================
+
 uploaded_file = st.file_uploader(
     f"Upload CSV for {func_name} (expected: {expected_csv[func_name]})",
     type="csv"
 )
 
-# ======================================
-# Vérification du fichier CSV
-# ======================================
 if uploaded_file:
 
     if uploaded_file.name != expected_csv[func_name]:
