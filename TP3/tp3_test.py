@@ -5,43 +5,24 @@ import streamlit as st
 from mpl_toolkits.mplot3d import Axes3D
 
 # ======================================
-# Fonctions d'évaluation
+# Fonctions d’évaluation
 # ======================================
-
-def f1(X): 
-    return np.sum(X**2)
-
-def f2(X): 
-    return np.sum(np.abs(X)) + np.prod(np.abs(X))
-
+def f1(X): return np.sum(X**2)
+def f2(X): return np.sum(abs(X)) + np.prod(abs(X))
 def f5(X):
     xi1, xi = X[1:], X[:-1]
     return np.sum(100*(xi1**2 - xi)**2 + (1 - xi)**2)
-
 def f7(X):
     D = len(X)
     return np.sum(np.arange(1, D+1) * X**4) + np.random.rand()
-
-def f8(X): 
-    return np.sum(-X * np.sin(np.sqrt(np.abs(X))))
-
-def f9(X): 
-    return np.sum(X**2 - 10*np.cos(2*np.pi*X) + 10)
-
+def f8(X): return np.sum(-X * np.sin(np.sqrt(abs(X))))
+def f9(X): return np.sum(X**2 - 10*np.cos(2*np.pi*X) + 10)
 def f11(X):
     D = len(X)
     indices = np.arange(1, D+1)
     return 1 + np.sum(X**2)/4000 - np.prod(np.cos(X/np.sqrt(indices)))
 
-functions = {
-    "F1": f1, 
-    "F2": f2, 
-    "F5": f5, 
-    "F7": f7, 
-    "F8": f8, 
-    "F9": f9, 
-    "F11": f11
-}
+functions = {"F1": f1, "F2": f2, "F5": f5, "F7": f7, "F8": f8, "F9": f9, "F11": f11}
 
 expected_csv = {
     "F1": "Population_F1-UM.csv",
@@ -56,13 +37,12 @@ expected_csv = {
 # ======================================
 # Interface Streamlit
 # ======================================
-
 st.title("PW - Metaheuristics")
 st.subheader("Optimization Benchmark Problems")
 
 func_name = st.selectbox("Function", list(functions.keys()))
 
-D = st.number_input("Dimension (D)", 2, 1000, 30)
+D = st.number_input("Dimension (D)", 1, 1000, 30)
 low = st.number_input("Range min", -100.0)
 high = st.number_input("Range max", 100.0)
 
@@ -74,9 +54,10 @@ uploaded_file = st.file_uploader(
     type="csv"
 )
 
-# ======================================
-# Import CSV Population
-# ======================================
+
+# ==============================================
+# Importation de la population depuis un CSV
+# ==============================================
 
 if uploaded_file is not None:
 
@@ -90,36 +71,42 @@ if uploaded_file is not None:
     pop = df.values[:, :int(D)]
 
     # ======================================
-    # Evaluate Population
+    # Bouton d’évaluation
     # ======================================
-
     if st.button("Evaluate population"):
 
         all_runs_fitness = []
 
+        # ======================================
+        # CALCUL DES FITNESS
+        # ======================================
         for r in range(runs):
             sample_size = min(population_size, len(pop))
             idx = np.random.choice(len(pop), sample_size, replace=False)
             sample = pop[idx]
+
             fitness_vals = np.array([functions[func_name](ind) for ind in sample])
             all_runs_fitness.append(fitness_vals)
 
         all_runs_fitness = np.concatenate(all_runs_fitness)
 
-        st.subheader("Statistics")
+        # ======================================
+        # STATISTIQUES
+        # ======================================
+        st.write("### Statistics")
         st.success(f"Min (Best) = {np.min(all_runs_fitness):.4f}")
         st.warning(f"Max (Worst) = {np.max(all_runs_fitness):.4f}")
         st.info(f"Mean = {all_runs_fitness.mean():.4f} — STD = {all_runs_fitness.std():.4f}")
 
         # ======================================
-        # 2D Contour Plot
+        # 2D CONTOUR PLOT
         # ======================================
-
         st.subheader("2D Contour Plot")
 
         X = np.linspace(low, high, 100)
         Y = np.linspace(low, high, 100)
         Xg, Yg = np.meshgrid(X, Y)
+
         Z = np.zeros_like(Xg)
 
         for i in range(Xg.shape[0]):
@@ -129,37 +116,46 @@ if uploaded_file is not None:
                 vec[1] = Yg[i, j]
                 Z[i, j] = functions[func_name](vec)
 
-        fig_contour, ax_contour = plt.subplots()
-        contour = ax_contour.contour(Xg, Yg, Z, levels=30, cmap="viridis")
-        ax_contour.scatter(pop[:, 0], pop[:, 1], c="red", s=10)
+        fig_contour, ax_contour = plt.subplots(figsize=(8, 6))
+        contour = ax_contour.contour(Xg, Yg, Z, levels=30, linewidths=0.7, cmap="viridis")
+        ax_contour.clabel(contour, inline=True, fontsize=8)
+
+        # Ajouter des points de population
+        idx = np.random.choice(len(pop), min(80, len(pop)), replace=False)
+        sample2d = pop[idx, :2]
+        ax_contour.scatter(sample2d[:, 0], sample2d[:, 1], c="red", s=20)
+
         ax_contour.set_title(f"Contour Plot ({func_name})")
         ax_contour.set_xlabel("x1")
         ax_contour.set_ylabel("x2")
+
         st.pyplot(fig_contour)
 
         # ======================================
-        # 3D Surface Plot
+        # 3D SURFACE PLOT
         # ======================================
-
         st.subheader("3D Surface Plot")
 
-        fig_surface = plt.figure()
+        fig_surface = plt.figure(figsize=(8, 6))
         ax_surface = fig_surface.add_subplot(111, projection='3d')
-        ax_surface.plot_surface(Xg, Yg, Z, cmap="viridis", alpha=0.8)
+
+        ax_surface.plot_surface(Xg, Yg, Z, rstride=1, cstride=1, alpha=0.75, cmap="viridis")
         ax_surface.set_title(f"Surface Plot ({func_name})")
         ax_surface.set_xlabel("x1")
         ax_surface.set_ylabel("x2")
         ax_surface.set_zlabel("f(x)")
+
         st.pyplot(fig_surface)
 
-# ======================================
-# PSO Algorithm
-# ======================================
+#-------------------
+# Algorithme PSO
+#=====================
 
 def PSO(func, D, N, low, high, T, w, c1, c2):
 
     X = np.random.uniform(low, high, (N, D))
     V = np.zeros((N, D))
+    v_max = (high - low) * 0.5  # FIX 1: larger v_max for better exploration
 
     pbest = X.copy()
     pbest_fitness = np.array([func(x) for x in X])
@@ -174,21 +170,27 @@ def PSO(func, D, N, low, high, T, w, c1, c2):
 
     first_positions = X.copy()
 
+    w_max, w_min = 0.9, 0.4  # FIX 2: inertia bounds for linear decay
+
     for t in range(T):
 
         old_best = gbest_fitness
+
+        # FIX 2: linearly decay inertia from 0.9 → 0.4
+        w_t = w_max - (w_max - w_min) * (t / T)
 
         for i in range(N):
             r1 = np.random.rand(D)
             r2 = np.random.rand(D)
 
             V[i] = (
-                w * V[i]
+                w_t * V[i]  # FIX 2: use decaying w_t
                 + c1 * r1 * (pbest[i] - X[i])
                 + c2 * r2 * (gbest - X[i])
             )
 
-            X[i] = X[i] + V[i]
+            V[i] = np.clip(V[i], -v_max, v_max)
+            X[i] = np.clip(X[i] + V[i], low, high)
 
         fitness = np.array([func(x) for x in X])
 
@@ -205,15 +207,17 @@ def PSO(func, D, N, low, high, T, w, c1, c2):
         history_avg.append(np.mean(fitness))
         trajectory.append(X[0, :2].copy())
 
-        if gbest_fitness == old_best:
+        # FIX 3: looser stagnation tolerance + more patience
+        if abs(gbest_fitness - old_best) < 1e-10:
             stagnation_counter += 1
         else:
             stagnation_counter = 0
 
-        if stagnation_counter >= 3:
+        if stagnation_counter >= 80:  # FIX 3: was 20
             break
 
     return first_positions, X.copy(), history_best, history_avg, np.array(trajectory), gbest_fitness, t
+        
 
 # ======================================
 # Metaheuristic Interface
@@ -237,8 +241,42 @@ if st.button("Run Metaheuristic"):
     st.success("Optimization Finished")
 
     # ======================================
+    # 1ST ITERATION
+    # ======================================
+
+    st.subheader("Search History - 1st Iteration")
+
+    init_fitness = np.array([func(x) for x in first_pos])
+    best_init = first_pos[np.argmin(init_fitness)]
+
+    # ======================================
+    # FINAL ITERATION
+    # ======================================
+
+    final_fitness = np.array([func(x) for x in final_pos])
+    best_final = final_pos[np.argmin(final_fitness)]
+
+    # ======================================
+    # STATISTICS
+    # ======================================
+
+    st.subheader("Statistics")
+
+    st.markdown("**Initial population:**")
+    st.markdown(
+        f"Best — {np.min(init_fitness):.2f}, "
+        f"Worst — {np.max(init_fitness):.2f}"
+    )
+
+    st.markdown("**Final population:**")
+    st.markdown(f"Best — {final_best:.4f}")
+
+    st.markdown(f"**Stagnation — Iteration N°{last_iter}**")
+
+    # ======================================
     # Compute contour grid
     # ======================================
+
 
     X_grid = np.linspace(low, high, 100)
     Y_grid = np.linspace(low, high, 100)
@@ -253,8 +291,8 @@ if st.button("Run Metaheuristic"):
             Z[i, j] = func(vec)
 
     st.markdown("### Application of PSO")
-
-    # ======================================
+    
+        # ======================================
     # 1ST ITERATION
     # ======================================
 
@@ -292,55 +330,3 @@ if st.button("Run Metaheuristic"):
     ax2.set_ylabel("x2")
     st.pyplot(fig2)
 
-    # ======================================
-    # STATISTICS
-    # ======================================
-
-    st.subheader("Statistics")
-
-    st.markdown("**Initial population:**")
-    st.markdown(
-        f"Best — {np.min(init_fitness):.2f}, "
-        f"Worst — {np.max(init_fitness):.2f}"
-    )
-
-    st.markdown("**Final population:**")
-    st.markdown(f"Best — {final_best:.4f}")
-
-    st.markdown(f"**Stagnation — Iteration N°{last_iter}**")
-
-    # ======================================
-    # Convergence Curve
-    # ======================================
-
-    st.subheader("Convergence Curve")
-
-    fig3, ax3 = plt.subplots()
-    ax3.plot(best_curve)
-    ax3.set_xlabel("Iteration")
-    ax3.set_ylabel("Best Fitness")
-    st.pyplot(fig3)
-
-    # ======================================
-    # Average Fitness
-    # ======================================
-
-    st.subheader("Average Fitness")
-
-    fig4, ax4 = plt.subplots()
-    ax4.plot(avg_curve)
-    ax4.set_xlabel("Iteration")
-    ax4.set_ylabel("Average Fitness")
-    st.pyplot(fig4)
-
-    # ======================================
-    # Trajectory
-    # ======================================
-
-    st.subheader("Trajectory of 1st Particle")
-
-    fig5, ax5 = plt.subplots()
-    ax5.plot(traj[:, 0], traj[:, 1])
-    ax5.set_xlabel("x1")
-    ax5.set_ylabel("x2")
-    st.pyplot(fig5) 

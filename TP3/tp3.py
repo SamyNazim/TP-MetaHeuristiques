@@ -174,10 +174,6 @@ def PSO(func, D, N, low, high, T, w, c1, c2):
 
     first_positions = X.copy()
 
-    # Store all positions across all iterations for search history
-    all_positions_history = [X.copy()]
-    gbest_per_iter = []
-
     for t in range(T):
 
         old_best = gbest_fitness
@@ -208,8 +204,6 @@ def PSO(func, D, N, low, high, T, w, c1, c2):
         history_best.append(gbest_fitness)
         history_avg.append(np.mean(fitness))
         trajectory.append(X[0, :2].copy())
-        all_positions_history.append(X.copy())
-        gbest_per_iter.append(gbest.copy())
 
         if gbest_fitness == old_best:
             stagnation_counter += 1
@@ -219,24 +213,13 @@ def PSO(func, D, N, low, high, T, w, c1, c2):
         if stagnation_counter >= 3:
             break
 
-    return (first_positions,
-            X.copy(),
-            history_best,
-            history_avg,
-            np.array(trajectory),
-            gbest_fitness,
-            pbest_fitness,
-            t,
-            all_positions_history,
-            gbest_per_iter)
+    return first_positions, X.copy(), history_best, history_avg, np.array(trajectory), gbest_fitness, t
 
 # ======================================
 # Metaheuristic Interface
 # ======================================
 
 st.subheader("Metaheuristic")
-
-meta = st.selectbox("Metaheuristic", ["PSO"])
 
 T = st.number_input("Max Iteration (T)", 1, 1000, 200)
 w = st.number_input("w (inertia)", value=0.3)
@@ -247,16 +230,9 @@ if st.button("Run Metaheuristic"):
 
     func = functions[func_name]
 
-    (first_pos,
-     final_pos,
-     best_curve,
-     avg_curve,
-     traj,
-     final_best,
-     final_pop_fitness,
-     last_iter,
-     all_positions_history,
-     gbest_per_iter) = PSO(func, D, population_size, low, high, T, w, c1, c2)
+    first_pos, final_pos, best_curve, avg_curve, traj, final_best, last_iter = PSO(
+        func, D, population_size, low, high, T, w, c1, c2
+    )
 
     st.success("Optimization Finished")
 
@@ -268,6 +244,7 @@ if st.button("Run Metaheuristic"):
     Y_grid = np.linspace(low, high, 100)
     Xg, Yg = np.meshgrid(X_grid, Y_grid)
     Z = np.zeros_like(Xg)
+
     for i in range(Xg.shape[0]):
         for j in range(Xg.shape[1]):
             vec = np.zeros(D)
@@ -275,102 +252,95 @@ if st.button("Run Metaheuristic"):
             vec[1] = Yg[i, j]
             Z[i, j] = func(vec)
 
+    st.markdown("### Application of PSO")
+
     # ======================================
-    # Application of PSO layout
+    # 1ST ITERATION
     # ======================================
 
-    st.markdown(f"**Application of PSO for {func_name} function:**")
-    st.markdown("**Single run:**")
+    st.subheader("Search History - 1st Iteration")
 
-    # Row 1: 3D surface | Search History 1st iter | Search History Final iter | Stats
-    col_3d, col_c1, col_c2, col_stats = st.columns([1.2, 1, 1, 1])
+    init_fitness = np.array([func(x) for x in first_pos])
+    best_init = first_pos[np.argmin(init_fitness)]
 
-    with col_3d:
-        st.markdown(f"**Function ({func_name}-{'UM' if func_name in ['F1','F2','F5','F7'] else 'MM'})**")
-        fig_3d = plt.figure(figsize=(4, 3))
-        ax_3d = fig_3d.add_subplot(111, projection='3d')
-        ax_3d.plot_surface(Xg, Yg, Z, cmap="viridis", alpha=0.9)
-        ax_3d.set_xlabel("$x_1$", fontsize=7)
-        ax_3d.set_ylabel("$x_2$", fontsize=7)
-        ax_3d.tick_params(labelsize=6)
-        st.pyplot(fig_3d)
+    fig1, ax1 = plt.subplots(figsize=(5, 5))
+    ax1.contour(Xg, Yg, Z, levels=30, cmap="viridis")
+    ax1.scatter(first_pos[:, 0], first_pos[:, 1], c="black", s=10)
+    ax1.scatter(best_init[0], best_init[1], c="red", s=80)
+    ax1.set_xlim(low, high)
+    ax1.set_ylim(low, high)
+    ax1.set_xlabel("x1")
+    ax1.set_ylabel("x2")
+    st.pyplot(fig1)
 
-    with col_c1:
-        # Search History 1st Iteration: first_pos (black dots) + best of first_pos (red dot)
-        init_fitness = np.array([func(x) for x in first_pos])
-        best_init_idx = np.argmin(init_fitness)
-        best_init = first_pos[best_init_idx]
+    # ======================================
+    # FINAL ITERATION
+    # ======================================
 
-        fig_c1, ax_c1 = plt.subplots(figsize=(3.5, 3.5))
-        ax_c1.contour(Xg, Yg, Z, levels=30, cmap="viridis")
-        ax_c1.scatter(first_pos[:, 0], first_pos[:, 1], c="black", s=8)
-        ax_c1.scatter(best_init[0], best_init[1], c="red", s=60, zorder=5)
-        ax_c1.set_title(f"Search History ({func_name}-{'UM' if func_name in ['F1','F2','F5','F7'] else 'MM'}), 1st Iteration", fontsize=7)
-        ax_c1.set_xlabel("$x_1$", fontsize=7)
-        ax_c1.set_ylabel("$x_2$", fontsize=7)
-        ax_c1.tick_params(labelsize=6)
-        ax_c1.set_xlim(low, high)
-        ax_c1.set_ylim(low, high)
-        st.pyplot(fig_c1)
+    st.subheader("Search History - Final Iteration")
 
-    with col_c2:
-        # Search History Final Iteration:
-        # black = all positions across all iterations
-        # orange = best solution at each iteration t (gbest_per_iter)
-        # red = final global best
-        all_pos_concat = np.vstack(all_positions_history)
-        gbest_arr = np.array(gbest_per_iter)
+    final_fitness = np.array([func(x) for x in final_pos])
+    best_final = final_pos[np.argmin(final_fitness)]
 
-        # Final gbest
-        final_gbest_pos = gbest_per_iter[-1] if gbest_per_iter else first_pos[np.argmin(init_fitness)]
+    fig2, ax2 = plt.subplots(figsize=(5, 5))
+    ax2.contour(Xg, Yg, Z, levels=30, cmap="viridis")
+    ax2.scatter(final_pos[:, 0], final_pos[:, 1], c="black", s=10)
+    ax2.scatter(best_final[0], best_final[1], c="red", s=80)
+    ax2.set_xlim(low, high)
+    ax2.set_ylim(low, high)
+    ax2.set_xlabel("x1")
+    ax2.set_ylabel("x2")
+    st.pyplot(fig2)
 
-        fig_c2, ax_c2 = plt.subplots(figsize=(3.5, 3.5))
-        ax_c2.contour(Xg, Yg, Z, levels=30, cmap="viridis")
-        ax_c2.scatter(all_pos_concat[:, 0], all_pos_concat[:, 1], c="black", s=4, alpha=0.3)
-        ax_c2.scatter(gbest_arr[:, 0], gbest_arr[:, 1], c="orange", s=30, zorder=4)
-        ax_c2.scatter(final_gbest_pos[0], final_gbest_pos[1], c="red", s=80, zorder=6)
-        ax_c2.set_title(f"Search History ({func_name}-{'UM' if func_name in ['F1','F2','F5','F7'] else 'MM'}), Final Iteration", fontsize=7)
-        ax_c2.set_xlabel("$x_1$", fontsize=7)
-        ax_c2.set_ylabel("$x_2$", fontsize=7)
-        ax_c2.tick_params(labelsize=6)
-        ax_c2.set_xlim(low, high)
-        ax_c2.set_ylim(low, high)
-        st.pyplot(fig_c2)
+    # ======================================
+    # STATISTICS
+    # ======================================
 
-    with col_stats:
-        init_fit = np.array([func(x) for x in first_pos])
-        st.markdown("**Initial population:**")
-        st.markdown(f"**Best** — {np.min(init_fit):.2f}, **Worst** — {np.max(init_fit):.2f}")
-        st.markdown("**Final population:**")
-        st.markdown(f"**Best** — {final_best:.1f}")
-        st.markdown(f"**Stagnation** — Iteration N°{last_iter}")
+    st.subheader("Statistics")
 
-    # Row 2: Convergence Curve | Trajectory of 1st solution | Average Fitness
-    col_conv, col_traj, col_avg = st.columns(3)
+    st.markdown("**Initial population:**")
+    st.markdown(
+        f"Best — {np.min(init_fitness):.2f}, "
+        f"Worst — {np.max(init_fitness):.2f}"
+    )
 
-    with col_conv:
-        fig_conv, ax_conv = plt.subplots(figsize=(4, 3))
-        ax_conv.plot(best_curve, color="red")
-        ax_conv.set_title("Convergence Curve", fontsize=9)
-        ax_conv.set_xlabel("Iteration", fontsize=8)
-        ax_conv.set_ylabel("Fitness", fontsize=8)
-        ax_conv.tick_params(labelsize=7)
-        st.pyplot(fig_conv)
+    st.markdown("**Final population:**")
+    st.markdown(f"Best — {final_best:.4f}")
 
-    with col_traj:
-        fig_traj, ax_traj = plt.subplots(figsize=(4, 3))
-        ax_traj.plot(traj[:, 0], traj[:, 1], color="green")
-        ax_traj.set_title("Trajectory of 1st solution", fontsize=9)
-        ax_traj.set_xlabel("Iteration", fontsize=8)
-        ax_traj.set_ylabel("$x_1$", fontsize=8)
-        ax_traj.tick_params(labelsize=7)
-        st.pyplot(fig_traj)
+    st.markdown(f"**Stagnation — Iteration N°{last_iter}**")
 
-    with col_avg:
-        fig_avg, ax_avg = plt.subplots(figsize=(4, 3))
-        ax_avg.plot(avg_curve, color="blue")
-        ax_avg.set_title("Average Fitness", fontsize=9)
-        ax_avg.set_xlabel("Iteration", fontsize=8)
-        ax_avg.set_ylabel("Fitness", fontsize=8)
-        ax_avg.tick_params(labelsize=7)
-        st.pyplot(fig_avg)
+    # ======================================
+    # Convergence Curve
+    # ======================================
+
+    st.subheader("Convergence Curve")
+
+    fig3, ax3 = plt.subplots()
+    ax3.plot(best_curve)
+    ax3.set_xlabel("Iteration")
+    ax3.set_ylabel("Best Fitness")
+    st.pyplot(fig3)
+
+    # ======================================
+    # Average Fitness
+    # ======================================
+
+    st.subheader("Average Fitness")
+
+    fig4, ax4 = plt.subplots()
+    ax4.plot(avg_curve)
+    ax4.set_xlabel("Iteration")
+    ax4.set_ylabel("Average Fitness")
+    st.pyplot(fig4)
+
+    # ======================================
+    # Trajectory
+    # ======================================
+
+    st.subheader("Trajectory of 1st Particle")
+
+    fig5, ax5 = plt.subplots()
+    ax5.plot(traj[:, 0], traj[:, 1])
+    ax5.set_xlabel("x1")
+    ax5.set_ylabel("x2")
+    st.pyplot(fig5) 
