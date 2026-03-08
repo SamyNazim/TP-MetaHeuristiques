@@ -281,9 +281,9 @@ def PSO(func, D, N, low, high, T, w, c1, c2):
 st.subheader("PSO Hyperparameters")
 
 T = st.number_input("Max Iteration (T)", 1, 1000, 200)
-w = st.number_input("w (inertia)", value=0.3)
-c1 = st.number_input("c1 (cognitive)", value=1.4)
-c2 = st.number_input("c2 (social)", value=1.4)
+w = st.number_input("w (inertia)", value=0.5)
+c1 = st.number_input("c1 (cognitive)", value=2.0)
+c2 = st.number_input("c2 (social)", value=2.0)
 
 if st.button("Run PSO"):
 
@@ -552,9 +552,9 @@ with st.container(border=True):
                              label="Best solution per run")
 
             ax_final.scatter(best_overall[0], best_overall[1],
-                             c="red", s=200, zorder=6, marker="o",
-                             edgecolors="white", linewidths=1.5,
-                             label="Best global solution")
+                 c="red", s=60, zorder=6, marker="o",
+                 edgecolors="white", linewidths=1,
+                 label="Best global solution")
 
             ax_final.set_xlim(low, high)
             ax_final.set_ylim(low, high)
