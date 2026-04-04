@@ -83,6 +83,41 @@ formulas = {
 }
 
 # ======================================
+# Predefined Test Cases
+# ======================================
+
+PREDEFINED_CASES = {
+    "Case 1 – SF=25, α=0.9": {
+        "SF": 25,
+        "alpha": 0.9,
+        "solution": [
+            0.74, 0.56, 0.79, 0.92, 0.28, 0.13, 0.53, 0.80, 0.49, 0.91,
+            0.91, 0.88, 0.71, 0.96, 0.31, 0.30, 0.01, 0.14, 0.36, 0.42,
+            0.53, 0.99, 0.73, 0.53, 0.84, 0.10, 0.34, 0.63, 0.02, 0.29,
+            0.46, 0.30, 0.18, 0.21, 0.23, 0.78, 0.59, 0.50, 0.27, 0.30,
+            0.36, 0.99, 0.15, 0.60, 0.03, 0.37, 0.52, 0.12, 0.32, 0.69,
+            0.48, 0.91, 0.45, 0.57, 0.46, 0.62, 0.68, 0.48, 0.27, 0.94,
+            0.47, 0.70, 0.12, 0.35
+        ],
+        "indices": [0, 1, 2, 3, 7, 9, 10, 11, 12, 13, 21, 22, 24, 27, 35, 36, 41, 43, 49, 51, 53, 55, 56, 59, 61],
+    },
+    "Case 2 – SF=10, α=0.9": {
+        "SF": 10,
+        "alpha": 0.9,
+        "solution": [
+            0.80, 0.70, 0.89, 0.55, 0.78, 0.63, 0.36, 0.83, 0.18, 0.94,
+            0.31, 0.22, 0.53, 0.69, 0.41, 0.52, 0.55, 0.23, 0.74, 0.73,
+            0.82, 0.45, 0.35, 0.67, 0.12, 0.62, 0.38, 0.93, 0.04, 0.54,
+            0.72, 0.09, 0.23, 0.36, 0.21, 0.56, 0.07, 0.37, 0.60, 0.31,
+            0.73, 0.24, 0.71, 0.46, 0.94, 0.17, 0.00, 0.65, 0.48, 0.19,
+            0.34, 0.15, 0.42, 0.52, 0.31, 0.29, 0.34, 0.99, 0.59, 0.76,
+            0.32, 0.55, 0.16, 0.39
+        ],
+        "indices": [0, 2, 4, 7, 9, 20, 27, 44, 57, 59],
+    },
+}
+
+# ======================================
 # Interface Streamlit
 # ======================================
 
@@ -712,14 +747,24 @@ with fs_col1:
     dataset_choice = st.radio("Dataset", ["Synthetic", "Digits"], key="fs_dataset", label_visibility="collapsed")
 
 with fs_col2:
-    SF = st.number_input("Selected Features (SF)", min_value=1, max_value=64, value=5, key="fs_sf")
+    SF = st.number_input("Selected Features (SF)", min_value=0, max_value=64, value=5, key="fs_sf")
     alpha_fs = st.number_input("α", min_value=0.0, max_value=1.0, value=0.9, step=0.05, key="fs_alpha")
 
 with fs_col3:
     st.markdown("")
     st.markdown("")
-    btn_eval = st.button("Model Evaluation", key="btn_fs_eval")
-    btn_reeval = st.button("Model Re-evaluation", key="btn_fs_reeval")
+
+    # -------------------------------------------------------
+    # Predefined test case selector
+    # -------------------------------------------------------
+    case_options = ["— None (manual) —"] + list(PREDEFINED_CASES.keys())
+    selected_case = st.selectbox("Load predefined test case", case_options, key="fs_case")
+
+    btn_col1, btn_col2 = st.columns(2)
+    with btn_col1:
+        btn_eval = st.button("Model Evaluation", key="btn_fs_eval")
+    with btn_col2:
+        btn_reeval = st.button("Model Re-evaluation", key="btn_fs_reeval")
 
 # Load dataset
 if dataset_choice == "Synthetic":
@@ -734,27 +779,75 @@ D_fs = X_fs.shape[1]
 # -------------------------------------------------------
 
 if "fs_solution" not in st.session_state:
-    st.session_state.fs_solution = None
-    st.session_state.fs_indices = None
-    st.session_state.fs_fitness = None
-    st.session_state.fs_accuracy = None
-    st.session_state.fs_SF = None
+    st.session_state.fs_solution    = None
+    st.session_state.fs_indices     = None
+    st.session_state.fs_fitness     = None
+    st.session_state.fs_accuracy    = None
+    st.session_state.fs_SF          = None
+    st.session_state.fs_alpha_stored = None   # ← clé distincte du widget fs_alpha
 
 # -------------------------------------------------------
-# Model Evaluation — run PSO
+# Input validation helper
+# -------------------------------------------------------
+
+def validate_inputs(sf_val, alpha_val):
+    """Returns (is_valid, error_message)."""
+    if sf_val == 0:
+        return False, "**Selected Features (SF) cannot be 0.** Please choose at least 1 feature."
+    if alpha_val == 0.0:
+        return False, "**Alpha (α) cannot be 0.** A value of 0 means the classifier accuracy is completely ignored. Please set α > 0."
+    return True, ""
+
+# -------------------------------------------------------
+# Model Evaluation — run PSO  OR  load predefined case
 # -------------------------------------------------------
 
 if btn_eval:
-    with st.spinner("Running PSO for Feature Selection..."):
-        solution, fit_val, acc_val, sel_indices = PSO_FS(
-            X_fs, y_fs, SF=int(SF), alpha=float(alpha_fs),
-            N=30, T=100, w=0.5, c1=2.0, c2=2.0
-        )
-    st.session_state.fs_solution  = solution
-    st.session_state.fs_indices   = sel_indices
-    st.session_state.fs_fitness   = fit_val
-    st.session_state.fs_accuracy  = acc_val
-    st.session_state.fs_SF        = int(SF)
+    # Validation
+    is_valid, err_msg = validate_inputs(int(SF), float(alpha_fs))
+    if not is_valid:
+        st.error(err_msg)
+    else:
+        # Load predefined case if selected
+        if selected_case != "— None (manual) —":
+            case_data = PREDEFINED_CASES[selected_case]
+            solution_arr = np.array(case_data["solution"])
+
+            # Pad or trim solution to match D_fs if needed
+            if len(solution_arr) < D_fs:
+                solution_arr = np.concatenate([solution_arr, np.random.uniform(0, 1, D_fs - len(solution_arr))])
+            elif len(solution_arr) > D_fs:
+                solution_arr = solution_arr[:D_fs]
+
+            sf_to_use    = case_data["SF"]
+            alpha_to_use = case_data["alpha"]
+
+            fit_val, acc_val, sel_indices = fitness_fs(
+                solution_arr, X_fs, y_fs, SF=sf_to_use, alpha=alpha_to_use
+            )
+
+            st.session_state.fs_solution     = solution_arr
+            st.session_state.fs_indices      = sel_indices
+            st.session_state.fs_fitness      = fit_val
+            st.session_state.fs_accuracy     = acc_val
+            st.session_state.fs_SF           = sf_to_use
+            st.session_state.fs_alpha_stored = alpha_to_use   
+
+            st.info(f"Loaded predefined solution: **{selected_case}**")
+
+        else:
+            # Normal PSO run
+            with st.spinner("Running PSO for Feature Selection..."):
+                solution, fit_val, acc_val, sel_indices = PSO_FS(
+                    X_fs, y_fs, SF=int(SF), alpha=float(alpha_fs),
+                    N=30, T=100, w=0.5, c1=2.0, c2=2.0
+                )
+            st.session_state.fs_solution     = solution
+            st.session_state.fs_indices      = sel_indices
+            st.session_state.fs_fitness      = fit_val
+            st.session_state.fs_accuracy     = acc_val
+            st.session_state.fs_SF           = int(SF)
+            st.session_state.fs_alpha_stored = float(alpha_fs)   
 
 # -------------------------------------------------------
 # Model Re-evaluation — re-evaluate stored solution with new SF / alpha
@@ -764,14 +857,20 @@ if btn_reeval:
     if st.session_state.fs_solution is None:
         st.warning("Please run Model Evaluation first.")
     else:
-        solution = st.session_state.fs_solution
-        fit_val, acc_val, sel_indices = fitness_fs(
-            solution, X_fs, y_fs, SF=int(SF), alpha=float(alpha_fs)
-        )
-        st.session_state.fs_indices   = sel_indices
-        st.session_state.fs_fitness   = fit_val
-        st.session_state.fs_accuracy  = acc_val
-        st.session_state.fs_SF        = int(SF)
+        # Validation
+        is_valid, err_msg = validate_inputs(int(SF), float(alpha_fs))
+        if not is_valid:
+            st.error(err_msg)
+        else:
+            solution = st.session_state.fs_solution
+            fit_val, acc_val, sel_indices = fitness_fs(
+                solution, X_fs, y_fs, SF=int(SF), alpha=float(alpha_fs)
+            )
+            st.session_state.fs_indices      = sel_indices
+            st.session_state.fs_fitness      = fit_val
+            st.session_state.fs_accuracy     = acc_val
+            st.session_state.fs_SF           = int(SF)
+            st.session_state.fs_alpha_stored = float(alpha_fs)   
 
 # -------------------------------------------------------
 # Display results
@@ -784,6 +883,7 @@ if st.session_state.fs_solution is not None:
     fit_val    = st.session_state.fs_fitness
     acc_val    = st.session_state.fs_accuracy
     sf_val     = st.session_state.fs_SF
+    alpha_val  = st.session_state.get("fs_alpha_stored", float(alpha_fs))   
 
     sol_str    = " | ".join([f"{v:.2f}" for v in solution])
     idx_str    = " | ".join([str(i) for i in sel_idx])
@@ -800,5 +900,6 @@ if st.session_state.fs_solution is not None:
     st.markdown(
         f"**Fitness** — {fit_val:.2f}, "
         f"**Accuracy** — {acc_val:.2f}, "
-        f"**Selected Features** — {sf_val}"
+        f"**Selected Features** — {sf_val}, "
+        f"**α** — {alpha_val}"
     )
