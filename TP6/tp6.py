@@ -668,7 +668,9 @@ def load_digits_data():
 # KNN accuracy on selected features
 # -------------------------------------------------------
 
-def evaluate_knn(X, y, selected_indices, k=st.session_state.fs_SF):
+def evaluate_knn(X, y, selected_indices, k=5):   
+    if len(selected_indices) == 0:
+        return 0.0
     X_sel = X[:, selected_indices]
     X_train, X_test, y_train, y_test = train_test_split(
         X_sel, y, test_size=0.3, random_state=42
@@ -682,12 +684,14 @@ def evaluate_knn(X, y, selected_indices, k=st.session_state.fs_SF):
 # Fitness function  f(x) = α·f1(x) + (1-α)·f2(x)
 # -------------------------------------------------------
 
-def fitness_fs(solution, X, y, SF, alpha, k=st.session_state.fs_SF):
+def fitness_fs(solution, X, y, SF, alpha, k=5):
     D_feat = X.shape[1]
-    indices = np.argsort(solution>0.5)[-SF:]
+    indices = np.where(solution > 0.5)[0]           
+    if len(indices) == 0:                            
+        indices = np.array([np.argmax(solution)])
     accuracy = evaluate_knn(X, y, indices, k)
-    f1_val = 1.0 - accuracy         
-    f2_val = SF / D_feat           
+    f1_val = 1.0 - accuracy
+    f2_val = len(indices) / D_feat                   
     return alpha * f1_val + (1 - alpha) * f2_val, accuracy, sorted(indices.tolist())
 
 # -------------------------------------------------------
